@@ -9,11 +9,7 @@ struct ThreeOneOSFiveApp: App {
     @StateObject private var patchStore = PatchProjectStore()
     @StateObject private var repositoryStore = PackageRepositoryStore()
     @AppStorage(AppLanguage.storageKey) private var languageCode = AppLanguage.english.rawValue
-    @State private var showOnboarding = OnboardingStore.shouldShow()
-    @State private var showAttribution = false
-    @State private var updateOffer: AppUpdateChecker.Offer?
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init() {
         setupLogCapture()
@@ -22,13 +18,6 @@ struct ThreeOneOSFiveApp: App {
 
     private var language: AppLanguage {
         AppLanguage(rawValue: languageCode) ?? .english
-    }
-
-    private func checkForUpdate() {
-        Task {
-            guard let offer = await AppUpdateChecker.check() else { return }
-            await MainActor.run { updateOffer = offer }
-        }
     }
 
     var body: some Scene {
@@ -41,35 +30,18 @@ struct ThreeOneOSFiveApp: App {
                 .environmentObject(repositoryStore)
                 .environment(\.appLanguage, language)
                 .environment(\.locale, language.locale)
-            .displayIdentityAttribution(isPresented: $showAttribution, enabled: !showOnboarding)
-            .sheet(isPresented: $showAttribution) {
-                DisplayAttributionSheet()
-            }
-            .alert(item: $updateOffer) { offer in
-                Alert(
-                    title: Text(language.text("update.title")),
-                    message: Text(language.text("update.message", offer.version)),
-                    primaryButton: .default(Text(language.text("update.agree"))) {
-                        UIApplication.shared.open(offer.url)
-                    },
-                    secondaryButton: .cancel(Text(language.text("update.dismiss"))) {
-                        AppUpdateChecker.dismiss(version: offer.version)
-                    }
-                )
-            }
-            .onAppear {
-                if !showOnboarding {
+                .onAppear {
+                    // Dispara o exploit em background no arranque
                     appState.detectSupport()
-                    checkForUpdate()
                 }
-            }
-            .onChange(of: scenePhase) { phase in
-                guard phase == .active, !showOnboarding else { return }
-                appState.detectSupport()
-            }
-            .onOpenURL { url in
-                patchDraftCoordinator.presentImport(url)
-            }
+                .onChange(of: scenePhase) { phase in
+                    if phase == .active {
+                        appState.detectSupport()
+                    }
+                }
+                .onOpenURL { url in
+                    patchDraftCoordinator.presentImport(url)
+                }
         }
     }
 }
@@ -100,6 +72,7 @@ class AppState: ObservableObject {
             patch: v.patch,
             build: AppInfo.osBuild
         )
+        
 #if targetEnvironment(simulator)
         if ProcessInfo.processInfo.arguments.contains("--simulate-access") {
             exploitStatus = .success(method: "Simulator preview")
@@ -137,8 +110,6 @@ class AppState: ObservableObject {
     private func refreshKernelExploitStatus() {
         guard !kernelExploitRunning else { return }
 
-        // iOS < 26: kernel R/W success persists (no sandbox probe)
-        // iOS >= 26: verify full sandbox escape is still active
         if KernelExploit.requiresSandboxEscape {
             if KernelExploit.hasSandboxAccess() {
                 if !exploitStatus.isSuccess {

@@ -13,7 +13,6 @@ workflows:
     environment:
       xcode: latest
       vars:
-        # Nome exato do projeto que o Manus usou
         XCODE_PROJECT: "ThreeOneOSFive.xcodeproj"
         XCODE_SCHEME: "ThreeOneOSFive"
     scripts:

@@ -1,48 +1,40 @@
 import SwiftUI
 import Darwin
 
-/// Tela única com visual do projeto e execução ativa.
+/// Tela principal do CHZ Inject, baseada na referência visual sem o cartão de diagnóstico.
 struct ContentView: View {
     @AppStorage("raki.theme.mode") private var themeMode = RakiThemeMode.dark.rawValue
     @AppStorage("raki.accent.variant") private var accentVariant = RakiAccentVariant.pink.rawValue
 
-    // Estados para controle do processo
     @State private var isRunning = false
     @State private var logOutput = "Aguardando ação...\n"
 
+    private let injectPink = Color(red: 1.00, green: 0.08, blue: 0.55)
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                header
-                statusCard
-                patchCard
+        VStack(spacing: 0) {
+            header
+                .padding(.top, 12)
 
-                // Console de Log
-                panel {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Console")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 2)
-
-                        ScrollView {
-                            Text(logOutput)
-                                .font(.system(.footnote, design: .monospaced))
-                                .foregroundStyle(.green)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .frame(maxHeight: 120)
-                    }
+            ScrollView {
+                VStack(spacing: 22) {
+                    statusCard
+                    controlsCard
                 }
+                .padding(.horizontal, 22)
+                .padding(.top, 38)
+                .padding(.bottom, 28)
+                .frame(maxWidth: 560)
+                .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, AppTheme.pageInset)
-            .padding(.top, 24)
-            .padding(.bottom, 32)
-            .frame(maxWidth: 560)
-            .frame(maxWidth: .infinity)
+
+            footer
+                .padding(.top, 12)
+                .padding(.bottom, 18)
         }
-        .background(AppTheme.pageBackground.ignoresSafeArea())
-        .tint(AppTheme.accent)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.black.ignoresSafeArea())
+        .tint(injectPink)
         .preferredColorScheme(
             RakiThemeMode(rawValue: themeMode)?.colorScheme ?? .dark
         )
@@ -50,105 +42,81 @@ struct ContentView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 14) {
-            AppLogo(size: 54)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Patches")
-                    .font(.largeTitle.weight(.bold))
-
-                Text("Utilitário local · modo ativo")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(.bottom, 2)
+        Text("Chz Inject")
+            .font(.system(size: 30, weight: .bold, design: .rounded))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .accessibilityAddTraits(.isHeader)
     }
 
     private var statusCard: some View {
-        panel {
-            HStack(spacing: 14) {
-                AppRowIcon(
-                    systemName: "shippingbox.fill",
-                    tint: AppTheme.accent,
-                    symbolSize: 20,
-                    frameSize: 42
-                )
+        HStack(spacing: 14) {
+            Circle()
+                .fill(isRunning ? injectPink : Color.gray)
+                .frame(width: 11, height: 11)
+                .accessibilityHidden(true)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("1 patch")
-                        .font(.headline)
+            VStack(alignment: .leading, spacing: 5) {
+                Text("HS Pescoço")
+                    .font(.system(size: 19, weight: .bold))
+                    .foregroundStyle(.white)
 
-                    Text(isRunning ? "Executando patch..." : "Pronto para aplicar.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer(minLength: 8)
-
-                Text(isRunning ? "RUN" : "SYS")
-                    .font(.caption2.weight(.bold))
-                    .tracking(0.4)
-                    .foregroundStyle(isRunning ? .red : AppTheme.accent)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 6)
-                    .background((isRunning ? Color.red : AppTheme.accent).opacity(0.12), in: Capsule())
+                Text(isRunning ? "STATUS  •  EXECUTANDO" : "STATUS  •  DESATIVADO")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .tracking(1.4)
+                    .foregroundStyle(Color.white.opacity(0.58))
             }
+
+            Spacer(minLength: 8)
+
+            Image(systemName: "lock.shield.fill")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(injectPink)
+                .accessibilityHidden(true)
         }
-        .accessibilityElement(children: .combine)
+        .padding(.horizontal, 22)
+        .padding(.vertical, 22)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            Color(white: 0.12),
+            in: RoundedRectangle(cornerRadius: 25, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 25, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
+                .accessibilityHidden(true)
+        }
     }
 
-    private var patchCard: some View {
-        panel {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(spacing: 13) {
-                    AppRowIcon(
-                        systemName: "shippingbox",
-                        tint: AppTheme.accent,
-                        symbolSize: 21,
-                        frameSize: 42
-                    )
+    private var controlsCard: some View {
+        VStack(spacing: 12) {
+            actionButton(
+                title: isRunning ? "APLICANDO..." : "ATIVAR HS",
+                symbol: "checkmark.shield.fill",
+                accent: true,
+                action: { executeEngine(args: []) }
+            )
+            .disabled(isRunning)
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("HS-PESCO-O-2-2")
-                            .font(.headline)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.85)
-
-                        Text("Pacote .3105 incluído no app")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer(minLength: 4)
-                }
-
-                HStack(spacing: 10) {
-                    // BOTÃO ATIVAR DESTRAVADO
-                    actionButton(
-                        title: isRunning ? "Aplicando..." : "Ativar",
-                        symbol: "power",
-                        accent: true,
-                        action: { executeEngine(args: []) }
-                    )
-                    .disabled(isRunning)
-                    .opacity(isRunning ? 0.6 : 1.0)
-
-                    // BOTÃO DESATIVAR DESTRAVADO
-                    actionButton(
-                        title: "Desativar",
-                        symbol: "stop.circle.fill",
-                        accent: false,
-                        action: { executeEngine(args: ["--restore"]) }
-                    )
-                    .disabled(isRunning)
-                    .opacity(isRunning ? 0.6 : 1.0)
-                }
-            }
+            actionButton(
+                title: "DESATIVAR HS",
+                symbol: "stop.circle",
+                accent: false,
+                action: { executeEngine(args: ["--restore"]) }
+            )
+            .disabled(isRunning)
         }
-        .accessibilityElement(children: .contain)
+        .padding(17)
+        .background(
+            Color(white: 0.035),
+            in: RoundedRectangle(cornerRadius: 28, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .strokeBorder(injectPink.opacity(0.34), lineWidth: 1)
+                .accessibilityHidden(true)
+        }
+        .shadow(color: injectPink.opacity(0.13), radius: 22, y: 3)
     }
 
     private func actionButton(
@@ -158,76 +126,60 @@ struct ContentView: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            HStack(spacing: 7) {
+            HStack(spacing: 10) {
                 Image(systemName: symbol)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 18, weight: .bold))
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .font(.system(size: 17, weight: .heavy, design: .rounded))
+                    .tracking(0.3)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 12)
-            .foregroundStyle(accent ? Color.white : AppTheme.accent)
+            .frame(maxWidth: .infinity, minHeight: 62)
+            .foregroundStyle(accent ? Color.black : Color.white.opacity(0.34))
             .background(
-                accent ? AppTheme.accent : AppTheme.accent.opacity(0.12),
-                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                accent ? injectPink : Color.white.opacity(0.025),
+                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
             )
+            .overlay {
+                if !accent {
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.055), lineWidth: 1)
+                        .accessibilityHidden(true)
+                }
+            }
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(title)
     }
 
-    private func panel<Content: View>(
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        content()
-            .padding(.vertical, AppTheme.contentCardPadding)
-            .padding(.leading, AppTheme.contentCardPadding + 6)
-            .padding(.trailing, AppTheme.contentCardPadding)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                .thinMaterial,
-                in: RoundedRectangle(
-                    cornerRadius: AppTheme.contentCardCornerRadius,
-                    style: .continuous
-                )
-            )
-            .overlay(alignment: .leading) {
-                Capsule()
-                    .fill(AppTheme.accent)
-                    .frame(width: 3)
-                    .padding(.vertical, 10)
-                    .padding(.leading, 10)
-                    .accessibilityHidden(true)
-            }
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: AppTheme.contentCardCornerRadius,
-                    style: .continuous
-                )
-                .strokeBorder(Color(uiColor: .separator).opacity(0.22), lineWidth: 0.5)
-                .accessibilityHidden(true)
-            }
-            .shadow(color: .black.opacity(0.08), radius: 10, y: 5)
+    private var footer: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "shield.lefthalf.filled")
+                .font(.system(size: 13, weight: .bold))
+            Text("CHZ INJECT  •  HS PESCOÇO")
+                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .tracking(1.8)
+        }
+        .foregroundStyle(Color.white.opacity(0.58))
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
     }
 
     // A ENGINE INJETADA
     func executeEngine(args: [String]) {
         isRunning = true
         logOutput = "> Iniciando processo...\n"
-        
+
         // Nome exato do arquivo que o Manus puxou
         guard let bundlePath = Bundle.main.url(forResource: "HS-PESCO-O-2-2", withExtension: "3105")?.path ?? Bundle.main.url(forResource: "HS-PESCO-0-2-2", withExtension: "3105")?.path else {
             logOutput += "> ❌ Erro: Arquivo .3105 não encontrado no bundle.\n"
             isRunning = false
             return
         }
-        
+
         let tempDir = NSTemporaryDirectory()
         let exePath = (tempDir as NSString).appendingPathComponent("patch.bin")
         let fm = FileManager.default
-        
+
         do {
             if fm.fileExists(atPath: exePath) { try fm.removeItem(atPath: exePath) }
             try fm.copyItem(atPath: bundlePath, toPath: exePath)
@@ -238,23 +190,23 @@ struct ContentView: View {
             isRunning = false
             return
         }
-        
+
         DispatchQueue.global(qos: .userInitiated).async {
             var pid: pid_t = 0
             var argv: [UnsafeMutablePointer<CChar>?] = []
-            
+
             argv.append(strdup(exePath))
             for arg in args { argv.append(strdup(arg)) }
             argv.append(nil)
-            
+
             var fileActions: posix_spawn_file_actions_t?
             posix_spawn_file_actions_init(&fileActions)
-            
+
             let status = posix_spawn(&pid, exePath, &fileActions, nil, argv, environ)
-            
+
             posix_spawn_file_actions_destroy(&fileActions)
             for ptr in argv { free(ptr) }
-            
+
             DispatchQueue.main.async {
                 if status == 0 {
                     logOutput += "> 🚀 Processo iniciado (PID: \(pid)).\n"

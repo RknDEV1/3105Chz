@@ -2,27 +2,16 @@ name: Build unsigned iOS IPA
 
 on:
   workflow_dispatch:
-    inputs:
-      project_path:
-        description: "Caminho do .xcworkspace ou .xcodeproj (vazio = detectar automaticamente)"
-        required: false
-        type: string
-      scheme:
-        description: "Scheme compartilhado do Xcode (obrigatório)"
-        required: true
-        type: string
-      configuration:
-        description: "Configuração de build"
-        required: false
-        default: Release
-        type: string
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
 
 jobs:
   build-unsigned-ipa:
-    name: Build unsigned IPA
+    name: Build 3105 without code signing
     runs-on: macos-15
     timeout-minutes: 45
 
@@ -30,86 +19,28 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Select Xcode project or workspace
-        id: project
+      - name: Build iOS app without signing
         env:
-          INPUT_PROJECT_PATH: ${{ inputs.project_path }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          SELECTED="$(python3 - <<'PY'
-          import os
-          from pathlib import Path
-
-          provided = os.environ.get("INPUT_PROJECT_PATH", "").strip()
-          if provided:
-              candidates = [Path(provided)]
-          else:
-              workspaces = sorted(p for p in Path(".").glob("**/*.xcworkspace") if "Pods" not in p.parts)
-              projects = sorted(p for p in Path(".").glob("**/*.xcodeproj") if "Pods" not in p.parts)
-              candidates = workspaces if workspaces else projects
-              if len(candidates) != 1:
-                  print("Expected exactly one Xcode workspace/project; set project_path. Found:", file=__import__("sys").stderr)
-                  for p in candidates:
-                      print(p, file=__import__("sys").stderr)
-                  raise SystemExit(1)
-
-          path = candidates[0]
-          if not path.exists():
-              raise SystemExit(f"Project path does not exist: {path}")
-          if path.suffix not in {".xcworkspace", ".xcodeproj"}:
-              raise SystemExit("project_path must end in .xcworkspace or .xcodeproj")
-          print(path)
-          PY
-          )"
-
-          case "$SELECTED" in
-            *.xcworkspace) echo "container_flag=-workspace" >> "$GITHUB_OUTPUT" ;;
-            *.xcodeproj)   echo "container_flag=-project" >> "$GITHUB_OUTPUT" ;;
-            *) echo "Invalid Xcode container: $SELECTED"; exit 1 ;;
-          esac
-          echo "path=$SELECTED" >> "$GITHUB_OUTPUT"
-          echo "Using: $SELECTED"
-
-      - name: Show available schemes
-        env:
-          CONTAINER_FLAG: ${{ steps.project.outputs.container_flag }}
-          PROJECT_PATH: ${{ steps.project.outputs.path }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          xcodebuild "$CONTAINER_FLAG" "$PROJECT_PATH" -list
-
-      - name: Build app without code signing
-        env:
-          CONTAINER_FLAG: ${{ steps.project.outputs.container_flag }}
-          PROJECT_PATH: ${{ steps.project.outputs.path }}
-          SCHEME: ${{ inputs.scheme }}
-          CONFIGURATION: ${{ inputs.configuration }}
           DERIVED_DATA: ${{ runner.temp }}/DerivedData
-        shell: bash
         run: |
           set -euo pipefail
           xcodebuild \
-            "$CONTAINER_FLAG" "$PROJECT_PATH" \
-            -scheme "$SCHEME" \
-            -configuration "$CONFIGURATION" \
+            -project ThreeOneOSFive.xcodeproj \
+            -target 3105 \
+            -configuration Release \
             -sdk iphoneos \
-            -destination 'generic/platform=iOS' \
             -derivedDataPath "$DERIVED_DATA" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY='' \
             build
 
-      - name: Package app as unsigned IPA
+      - name: Package unsigned IPA
         env:
-          CONFIGURATION: ${{ inputs.configuration }}
           DERIVED_DATA: ${{ runner.temp }}/DerivedData
-        shell: bash
         run: |
           set -euo pipefail
-          PRODUCTS="$DERIVED_DATA/Build/Products/${CONFIGURATION}-iphoneos"
+          PRODUCTS="$DERIVED_DATA/Build/Products/Release-iphoneos"
           APP_PATH=""
 
           while IFS= read -r candidate; do
@@ -122,24 +53,21 @@ jobs:
           done < <(find "$PRODUCTS" -maxdepth 1 -type d -name '*.app' | sort)
 
           if [[ -z "$APP_PATH" ]]; then
-            echo "Could not find an iOS application .app in: $PRODUCTS"
+            echo "No iOS app bundle found in $PRODUCTS"
             find "$PRODUCTS" -maxdepth 2 -print || true
             exit 1
           fi
 
-          APP_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' "$APP_PATH/Info.plist" 2>/dev/null || basename "$APP_PATH" .app)"
           PACKAGE_DIR="$RUNNER_TEMP/ipa-package"
           mkdir -p "$PACKAGE_DIR/Payload"
           cp -R "$APP_PATH" "$PACKAGE_DIR/Payload/"
-          (cd "$PACKAGE_DIR" && /usr/bin/zip -qry "$GITHUB_WORKSPACE/${APP_NAME}-unsigned.ipa" Payload)
+          (cd "$PACKAGE_DIR" && /usr/bin/zip -qry "$GITHUB_WORKSPACE/3105-unsigned.ipa" Payload)
+          echo "Created 3105-unsigned.ipa (unsigned; signing is required before installation)."
 
-          echo "Created: ${APP_NAME}-unsigned.ipa"
-          echo "This IPA is not signed and cannot be installed until it is signed with a valid certificate/profile."
-
-      - name: Upload unsigned IPA
+      - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
-          name: unsigned-ipa
-          path: "*-unsigned.ipa"
+          name: 3105-unsigned-ipa
+          path: 3105-unsigned.ipa
           if-no-files-found: error
           retention-days: 7

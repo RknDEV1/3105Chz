@@ -1,0 +1,29 @@
+workflows:
+  ios-build:
+    name: iOS Unsigned Build
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: 'main'
+          include: true
+          source: true
+    environment:
+      xcode: latest
+      vars:
+        # Nome exato do projeto que o Manus usou
+        XCODE_PROJECT: "ThreeOneOSFive.xcodeproj"
+        XCODE_SCHEME: "ThreeOneOSFive"
+    scripts:
+      - name: Build IPA (Unsigned)
+        script: |
+          xcodebuild -project "$XCODE_PROJECT" -scheme "$XCODE_SCHEME" -configuration Release -sdk iphoneos -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+          
+          mkdir -p build/ipa/Payload
+          cp -r build/Build/Products/Release-iphoneos/*.app build/ipa/Payload/
+          cd build/ipa
+          zip -r App.ipa Payload
+    artifacts:
+      - build/ipa/App.ipa

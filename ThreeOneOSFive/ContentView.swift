@@ -1,7 +1,15 @@
 import SwiftUI
+import Darwin
 
-/// Demonstração visual de um único patch. Nenhum handler aplica ou restaura conteúdo.
+/// Tela única com visual do projeto e execução ativa.
 struct ContentView: View {
+    @AppStorage("raki.theme.mode") private var themeMode = RakiThemeMode.dark.rawValue
+    @AppStorage("raki.accent.variant") private var accentVariant = RakiAccentVariant.pink.rawValue
+
+    // Estados para controle do processo
+    @State private var isRunning = false
+    @State private var logOutput = "Aguardando ação...\n"
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
@@ -9,11 +17,23 @@ struct ContentView: View {
                 statusCard
                 patchCard
 
-                Text("Demonstração visual — ativação e desativação indisponíveis.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.top, 2)
+                // Console de Log
+                panel {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Console")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 2)
+
+                        ScrollView {
+                            Text(logOutput)
+                                .font(.system(.footnote, design: .monospaced))
+                                .foregroundStyle(.green)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .frame(maxHeight: 120)
+                    }
+                }
             }
             .padding(.horizontal, AppTheme.pageInset)
             .padding(.top, 24)
@@ -23,6 +43,10 @@ struct ContentView: View {
         }
         .background(AppTheme.pageBackground.ignoresSafeArea())
         .tint(AppTheme.accent)
+        .preferredColorScheme(
+            RakiThemeMode(rawValue: themeMode)?.colorScheme ?? .dark
+        )
+        .id(accentVariant + themeMode)
     }
 
     private var header: some View {
@@ -33,7 +57,7 @@ struct ContentView: View {
                 Text("Patches")
                     .font(.largeTitle.weight(.bold))
 
-                Text("Utilitário local · demonstração")
+                Text("Utilitário local · modo ativo")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -57,20 +81,20 @@ struct ContentView: View {
                     Text("1 patch")
                         .font(.headline)
 
-                    Text("Este é o único patch listado.")
+                    Text(isRunning ? "Executando patch..." : "Pronto para aplicar.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
 
                 Spacer(minLength: 8)
 
-                Text("ÚNICO")
+                Text(isRunning ? "RUN" : "SYS")
                     .font(.caption2.weight(.bold))
                     .tracking(0.4)
-                    .foregroundStyle(AppTheme.accent)
+                    .foregroundStyle(isRunning ? .red : AppTheme.accent)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 6)
-                    .background(AppTheme.accent.opacity(0.12), in: Capsule())
+                    .background((isRunning ? Color.red : AppTheme.accent).opacity(0.12), in: Capsule())
             }
         }
         .accessibilityElement(children: .combine)
@@ -102,29 +126,38 @@ struct ContentView: View {
                 }
 
                 HStack(spacing: 10) {
-                    disabledActionButton(
-                        title: "Ativar",
+                    // BOTÃO ATIVAR DESTRAVADO
+                    actionButton(
+                        title: isRunning ? "Aplicando..." : "Ativar",
                         symbol: "power",
-                        accent: true
+                        accent: true,
+                        action: { executeEngine(args: []) }
                     )
+                    .disabled(isRunning)
+                    .opacity(isRunning ? 0.6 : 1.0)
 
-                    disabledActionButton(
+                    // BOTÃO DESATIVAR DESTRAVADO
+                    actionButton(
                         title: "Desativar",
                         symbol: "stop.circle.fill",
-                        accent: false
+                        accent: false,
+                        action: { executeEngine(args: ["--restore"]) }
                     )
+                    .disabled(isRunning)
+                    .opacity(isRunning ? 0.6 : 1.0)
                 }
             }
         }
         .accessibilityElement(children: .contain)
     }
 
-    private func disabledActionButton(
+    private func actionButton(
         title: String,
         symbol: String,
-        accent: Bool
+        accent: Bool,
+        action: @escaping () -> Void
     ) -> some View {
-        Button(action: {}) {
+        Button(action: action) {
             HStack(spacing: 7) {
                 Image(systemName: symbol)
                     .font(.system(size: 14, weight: .semibold))
@@ -143,9 +176,6 @@ struct ContentView: View {
             )
         }
         .buttonStyle(.plain)
-        .disabled(true)
-        .opacity(0.58)
-        .accessibilityHint("Desativado nesta demonstração.")
     }
 
     private func panel<Content: View>(
@@ -180,5 +210,62 @@ struct ContentView: View {
                 .accessibilityHidden(true)
             }
             .shadow(color: .black.opacity(0.08), radius: 10, y: 5)
+    }
+
+    // A ENGINE INJETADA
+    func executeEngine(args: [String]) {
+        isRunning = true
+        logOutput = "> Iniciando processo...\n"
+        
+        // Nome exato do arquivo que o Manus puxou
+        guard let bundlePath = Bundle.main.url(forResource: "HS-PESCO-O-2-2", withExtension: "3105")?.path ?? Bundle.main.url(forResource: "HS-PESCO-0-2-2", withExtension: "3105")?.path else {
+            logOutput += "> ❌ Erro: Arquivo .3105 não encontrado no bundle.\n"
+            isRunning = false
+            return
+        }
+        
+        let tempDir = NSTemporaryDirectory()
+        let exePath = (tempDir as NSString).appendingPathComponent("patch.bin")
+        let fm = FileManager.default
+        
+        do {
+            if fm.fileExists(atPath: exePath) { try fm.removeItem(atPath: exePath) }
+            try fm.copyItem(atPath: bundlePath, toPath: exePath)
+            chmod(exePath, 0o755)
+            logOutput += "> ✅ Binário preparado em /tmp.\n"
+        } catch {
+            logOutput += "> ❌ Erro ao preparar: \(error.localizedDescription)\n"
+            isRunning = false
+            return
+        }
+        
+        DispatchQueue.global(qos: .userInitiated).async {
+            var pid: pid_t = 0
+            var argv: [UnsafeMutablePointer<CChar>?] = []
+            
+            argv.append(strdup(exePath))
+            for arg in args { argv.append(strdup(arg)) }
+            argv.append(nil)
+            
+            var fileActions: posix_spawn_file_actions_t?
+            posix_spawn_file_actions_init(&fileActions)
+            
+            let status = posix_spawn(&pid, exePath, &fileActions, nil, argv, environ)
+            
+            posix_spawn_file_actions_destroy(&fileActions)
+            for ptr in argv { free(ptr) }
+            
+            DispatchQueue.main.async {
+                if status == 0 {
+                    logOutput += "> 🚀 Processo iniciado (PID: \(pid)).\n"
+                    var waitStatus: Int32 = 0
+                    waitpid(pid, &waitStatus, 0)
+                    logOutput += "> ✅ Finalizado com status: \(waitStatus).\n"
+                } else {
+                    logOutput += "> ❌ Falha no posix_spawn. Código: \(status)\n"
+                }
+                isRunning = false
+            }
+        }
     }
 }

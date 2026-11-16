@@ -14,12 +14,17 @@ workflows:
       xcode: latest
       vars:
         XCODE_PROJECT: "ThreeOneOSFive.xcodeproj"
-        XCODE_SCHEME: "ThreeOneOSFive"
     scripts:
       - name: Build IPA (Unsigned)
         script: |
-          xcodebuild -project "$XCODE_PROJECT" -scheme "$XCODE_SCHEME" -configuration Release -sdk iphoneos -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+          # Descobre o nome do scheme automaticamente
+          SCHEME=$(xcodebuild -list -project "$XCODE_PROJECT" | grep -A 10 "Schemes:" | tail -n +2 | head -n 1 | xargs)
+          echo "Scheme detectado: $SCHEME"
           
+          # Compila usando o scheme que ele achou
+          xcodebuild -project "$XCODE_PROJECT" -scheme "$SCHEME" -configuration Release -sdk iphoneos -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+          
+          # Empacota o IPA
           mkdir -p build/ipa/Payload
           cp -r build/Build/Products/Release-iphoneos/*.app build/ipa/Payload/
           cd build/ipa

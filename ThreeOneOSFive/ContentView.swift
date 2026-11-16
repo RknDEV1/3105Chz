@@ -1,33 +1,15 @@
 import SwiftUI
 
-/// Tela única demonstrativa. Mantém as cores e os componentes visuais do 3105.
-/// Os controles são apenas visuais e permanecem desativados.
+/// Demonstração visual de um único patch. Nenhum handler aplica ou restaura conteúdo.
 struct ContentView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 header
                 statusCard
+                patchCard
 
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Ações")
-                        .font(.title3.weight(.bold))
-                        .padding(.horizontal, 2)
-
-                    actionButton(
-                        title: "Aplicar Atualização",
-                        detail: "Indisponível nesta demonstração",
-                        symbol: "arrow.down.circle.fill"
-                    )
-
-                    actionButton(
-                        title: "Restaurar",
-                        detail: "Indisponível nesta demonstração",
-                        symbol: "arrow.uturn.backward.circle.fill"
-                    )
-                }
-
-                Text("Demonstração visual — nenhuma ação será executada.")
+                Text("Demonstração visual — ativação e desativação indisponíveis.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -48,7 +30,7 @@ struct ContentView: View {
             AppLogo(size: 54)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Atualização")
+                Text("Patches")
                     .font(.largeTitle.weight(.bold))
 
                 Text("Utilitário local · demonstração")
@@ -65,28 +47,28 @@ struct ContentView: View {
         panel {
             HStack(spacing: 14) {
                 AppRowIcon(
-                    systemName: "iphone",
+                    systemName: "shippingbox.fill",
                     tint: AppTheme.accent,
-                    symbolSize: 21,
+                    symbolSize: 20,
                     frameSize: 42
                 )
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Modo demonstração")
+                    Text("1 patch")
                         .font(.headline)
 
-                    Text("Os controles estão desativados.")
+                    Text("Este é o único patch listado.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
 
                 Spacer(minLength: 8)
 
-                Text("UI")
-                    .font(.caption.weight(.bold))
-                    .tracking(0.5)
+                Text("ÚNICO")
+                    .font(.caption2.weight(.bold))
+                    .tracking(0.4)
                     .foregroundStyle(AppTheme.accent)
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 9)
                     .padding(.vertical, 6)
                     .background(AppTheme.accent.opacity(0.12), in: Capsule())
             }
@@ -94,43 +76,76 @@ struct ContentView: View {
         .accessibilityElement(children: .combine)
     }
 
-    private func actionButton(
-        title: String,
-        detail: String,
-        symbol: String
-    ) -> some View {
-        Button(action: {}) {
-            panel {
+    private var patchCard: some View {
+        panel {
+            VStack(alignment: .leading, spacing: 16) {
                 HStack(spacing: 13) {
                     AppRowIcon(
-                        systemName: symbol,
+                        systemName: "shippingbox",
                         tint: AppTheme.accent,
-                        symbolSize: 22,
+                        symbolSize: 21,
                         frameSize: 42
                     )
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(title)
+                        Text("HS-PESCO-O-2-2")
                             .font(.headline)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
 
-                        Text(detail)
+                        Text("Pacote .3105 incluído no app")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
 
-                    Spacer(minLength: 6)
+                    Spacer(minLength: 4)
+                }
 
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.tertiary)
-                        .accessibilityHidden(true)
+                HStack(spacing: 10) {
+                    disabledActionButton(
+                        title: "Ativar",
+                        symbol: "power",
+                        accent: true
+                    )
+
+                    disabledActionButton(
+                        title: "Desativar",
+                        symbol: "stop.circle.fill",
+                        accent: false
+                    )
                 }
             }
         }
+        .accessibilityElement(children: .contain)
+    }
+
+    private func disabledActionButton(
+        title: String,
+        symbol: String,
+        accent: Bool
+    ) -> some View {
+        Button(action: {}) {
+            HStack(spacing: 7) {
+                Image(systemName: symbol)
+                    .font(.system(size: 14, weight: .semibold))
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 12)
+            .foregroundStyle(accent ? Color.white : AppTheme.accent)
+            .background(
+                accent ? AppTheme.accent : AppTheme.accent.opacity(0.12),
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            )
+        }
         .buttonStyle(.plain)
         .disabled(true)
-        .opacity(0.62)
-        .accessibilityHint("Indisponível nesta demonstração.")
+        .opacity(0.58)
+        .accessibilityHint("Desativado nesta demonstração.")
     }
 
     private func panel<Content: View>(
